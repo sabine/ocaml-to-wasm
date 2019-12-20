@@ -1,0 +1,4 @@
+(library
+ (name clambda_frontend)
+ (modules clambda_types)
+ (libraries ocaml-compiler-libs.optcomp))
