@@ -1,25 +1,35 @@
+open Sexplib0
+open Sexp_conv
+
 (* Copied from parsing/asttypes.mli *)
 
 type direction_flag = Asttypes.direction_flag = Upto | Downto
+[@@deriving sexp]
 
 type mutable_flag = Asttypes.mutable_flag = Immutable | Mutable
+[@@deriving sexp]
 
 (* Copied from lambda/lambda.ml *)
 
 type boxed_integer = Lambda.boxed_integer =
     Pnativeint | Pint32 | Pint64
+[@@deriving sexp]
 
 type value_kind = Lambda.value_kind =
     Pgenval | Pfloatval | Pboxedintval of boxed_integer | Pintval
+[@@deriving sexp]
 
 type meth_kind = Lambda.meth_kind =
     Self | Public | Cached
+[@@deriving sexp]
 
 type block_shape = value_kind list option
+[@@deriving sexp]
 
 type immediate_or_pointer = Lambda.immediate_or_pointer =
   | Immediate
   | Pointer
+[@@deriving sexp]
 
 type initialization_or_assignment = Lambda.initialization_or_assignment =
   | Assignment
@@ -30,24 +40,30 @@ type initialization_or_assignment = Lambda.initialization_or_assignment =
   (* Initialization of roots only. Compiles to a simple store.
      No checks are done to preserve GC invariants.  *)
   | Root_initialization
+[@@deriving sexp]
 
 type raise_kind = Lambda.raise_kind =
   | Raise_regular
   | Raise_reraise
   | Raise_notrace
+[@@deriving sexp]
 
 type is_safe = Lambda.is_safe =
   | Safe
   | Unsafe
+[@@deriving sexp]
 
 type integer_comparison = Lambda.integer_comparison =
     Ceq | Cne | Clt | Cgt | Cle | Cge
+[@@deriving sexp]
 
 type float_comparison = Lambda.float_comparison =
     CFeq | CFneq | CFlt | CFnlt | CFgt | CFngt | CFle | CFnle | CFge | CFnge
+[@@deriving sexp]
 
 type array_kind = Lambda.array_kind =
     Pgenarray | Paddrarray | Pintarray | Pfloatarray
+[@@deriving sexp]
 
 type bigarray_kind = Lambda.bigarray_kind =
     Pbigarray_unknown
@@ -57,21 +73,69 @@ type bigarray_kind = Lambda.bigarray_kind =
   | Pbigarray_int32 | Pbigarray_int64
   | Pbigarray_caml_int | Pbigarray_native_int
   | Pbigarray_complex32 | Pbigarray_complex64
+[@@deriving sexp]
 
 type bigarray_layout = Lambda.bigarray_layout =
     Pbigarray_unknown_layout
   | Pbigarray_c_layout
   | Pbigarray_fortran_layout
+[@@deriving sexp]
+
+(* Copied from typing/ident.mli *)
+
+type ident = Ident.t
+let sexp_of_ident _ = Sexp.Atom "TODO"
+let ident_of_sexp _ = failwith "TODO"
 
 (* Copied from middle_end/backend_var.mli *)
 
-type backend_var = Backend_var.t
-type backend_var_with_provenance = Backend_var.With_provenance.t (* TODO: Write custom serialiser *)
+type backend_var = ident
+[@@deriving sexp]
+
+type backend_var_with_provenance = Backend_var.With_provenance.t
+let sexp_of_backend_var_with_provenance _ = Sexp.Atom "TODO"
+let backend_var_with_provenance_of_sexp _ = failwith "TODO"
 
 (* Copied from lambda/debuginfo.mli *)
 
 type debuginfo = Debuginfo.t
-(* TODO: Write custom serialiser *)
+let sexp_of_debuginfo _ = Sexp.Atom "TODO"
+let debuginfo_of_sexp _ = failwith "TODO"
+
+(* Copied from typing/types.mli *)
+
+type path = Path.t =
+    Pident of ident
+  | Pdot of path * string
+  | Papply of path * path
+[@@deriving sexp]
+
+type record_representation = Types.record_representation =
+    Record_regular            (* All fields are boxed / tagged *)
+  | Record_float              (* All fields are floats *)
+  | Record_unboxed of bool    (* Unboxed single-field record, inlined or not *)
+  | Record_inlined of int               (* Inlined record *)
+  | Record_extension of path          (* Inlined record under extension *)
+[@@deriving sexp]
+
+(* Copied from typing/primitive.mli *)
+
+type native_repr = Primitive.native_repr =
+  | Same_as_ocaml_repr
+  | Unboxed_float
+  | Unboxed_integer of boxed_integer
+  | Untagged_int
+[@@deriving sexp]
+
+type primitive_description = Primitive.description = private
+  { prim_name: string;         (* Name of primitive  or C function *)
+    prim_arity: int;           (* Number of arguments *)
+    prim_alloc: bool;          (* Does it allocates or raise? *)
+    prim_native_name: string;  (* Name of C function for the nat. code gen. *)
+    prim_native_repr_args: native_repr list;
+    prim_native_repr_res: native_repr }
+let sexp_of_primitive_description _ = Sexp.Atom "TODO"
+let primitive_description_of_sexp _ = failwith "TODO"
 
 (* Copied from middle_end/clambda_primitives.mli *)
 
@@ -79,6 +143,7 @@ type memory_access_size = Clambda_primitives.memory_access_size =
   | Sixteen
   | Thirty_two
   | Sixty_four
+[@@deriving sexp]
 
 type primitive = Clambda_primitives.primitive =
   | Pread_symbol of string
@@ -90,9 +155,9 @@ type primitive = Clambda_primitives.primitive =
   | Psetfield_computed of immediate_or_pointer * initialization_or_assignment
   | Pfloatfield of int
   | Psetfloatfield of int * initialization_or_assignment
-  | Pduprecord of Types.record_representation * int
+  | Pduprecord of record_representation * int
   (* External call *)
-  | Pccall of Primitive.description
+  | Pccall of primitive_description
   (* Exceptions *)
   | Praise of raise_kind
   (* Boolean operations *)
@@ -168,11 +233,13 @@ type primitive = Clambda_primitives.primitive =
   | Pint_as_pointer
   (* Inhibition of optimisation *)
   | Popaque
+[@@deriving sexp]
 
 
 (* Copied from middle_end/clambda.ml *)
 
 type function_label = string
+[@@deriving sexp]
 
 type ustructured_constant = Clambda.ustructured_constant =
   | Uconst_float of float
@@ -254,6 +321,7 @@ and ulambda_switch = Clambda.ulambda_switch =
     us_actions_consts: ulambda array;
     us_index_blocks: int array;
     us_actions_blocks: ulambda array}
+[@@deriving sexp]
 
 (* Description of known functions *)
 
@@ -264,6 +332,7 @@ type function_description = Clambda.function_description =
     mutable fun_inline: (backend_var_with_provenance list * ulambda) option;
     mutable fun_float_const_prop: bool  (* Can propagate FP consts *)
   }
+[@@deriving sexp]
 
 (* Approximation of values *)
 
@@ -273,17 +342,20 @@ type value_approximation = Clambda.value_approximation =
   | Value_unknown
   | Value_const of uconstant
   | Value_global_field of string * int
+[@@deriving sexp]
 
 (* Comparison functions for constants *)
 
 type usymbol_provenance = Clambda.usymbol_provenance = {
-  original_idents : Ident.t list;
-  module_path : Path.t;
+  original_idents : ident list;
+  module_path : path;
 }
+[@@deriving sexp]
 
 type uconstant_block_field = Clambda.uconstant_block_field =
   | Uconst_field_ref of string
   | Uconst_field_int of int
+[@@deriving sexp]
 
 type preallocated_block = Clambda.preallocated_block = {
   symbol : string;
@@ -292,6 +364,7 @@ type preallocated_block = Clambda.preallocated_block = {
   fields : uconstant_block_field option list;
   provenance : usymbol_provenance option;
 }
+[@@deriving sexp]
 
 type preallocated_constant = Clambda.preallocated_constant = {
   symbol : string;
@@ -299,3 +372,4 @@ type preallocated_constant = Clambda.preallocated_constant = {
   definition : ustructured_constant;
   provenance : usymbol_provenance option;
 }
+[@@deriving sexp]
