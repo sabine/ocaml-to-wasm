@@ -1,4 +1,5 @@
 (executable
- (name compile_to_clambda)
- (modules compile_to_clambda clambdacompile)
+ (name ocaml_to_clambda)
+ (modules ocaml_to_clambda clambdacompile)
  (libraries ocaml-compiler-libs.optcomp clambda_frontend))
+

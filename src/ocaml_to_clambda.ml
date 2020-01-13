@@ -1,4 +1,5 @@
 (* Compiler driver *)
+(* This has been butchered from the OCaml compiler and there is a lot of potential for simplification. Purpose: Compile OCaml to Clambda sexp and dump it. *)
 
 open Clflags
 open Compenv
