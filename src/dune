@@ -3,3 +3,7 @@
  (modules ocaml_to_clambda clambdacompile)
  (libraries ocaml-compiler-libs.optcomp clambda_frontend))
 
+(executable
+ (name clambda_to_wasm)
+ (modules clambda_to_wasm)
+ (libraries ocaml-compiler-libs.optcomp clambda_frontend sexplib))
