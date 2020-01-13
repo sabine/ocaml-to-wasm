@@ -23,7 +23,6 @@ open Format
 open Config
 open Clflags
 open Misc
-open Cmm
 
 type error = Assembler_error of string
 
@@ -130,53 +129,14 @@ let compile_fundecl ~ppf_dump fd_cmm =
   ++ pass_dump_linear_if ppf_dump dump_scheduling "After instruction scheduling"
   ++ Profile.record ~accumulate:true "emit" Emit.fundecl
 
-let compile_phrase ~ppf_dump p =
-  if !dump_cmm then fprintf ppf_dump "%a@." Printcmm.phrase p;
-  match p with
-  | Cfunction fd -> compile_fundecl ~ppf_dump fd
-  | Cdata dl -> Emit.data dl
-
-
-(* For the native toplevel: generates generic functions unless
-   they are already available in the process *)
-let compile_genfuns ~ppf_dump f =
-  List.iter
-    (function
-       | (Cfunction {fun_name = name}) as ph when f name ->
-           compile_phrase ~ppf_dump ph
-       | _ -> ())
-    (Cmmgen.generic_functions true [Compilenv.current_unit_infos ()])
-
-let compile_unit _output_prefix asm_filename keep_asm
-      obj_filename gen =
-  let create_asm = keep_asm || not !Emitaux.binary_backend_available in
-  Emitaux.create_asm_file := create_asm;
-  Misc.try_finally
-    ~exceptionally:(fun () -> remove_file obj_filename)
-    (fun () ->
-       if create_asm then Emitaux.output_channel := open_out asm_filename;
-       Misc.try_finally gen
-         ~always:(fun () ->
-             if create_asm then close_out !Emitaux.output_channel)
-         ~exceptionally:(fun () ->
-             if create_asm && not keep_asm then remove_file asm_filename);
-       let assemble_result =
-         Profile.record "assemble"
-           (Proc.assemble_file asm_filename) obj_filename
-       in
-       if assemble_result <> 0
-       then raise(Error(Assembler_error asm_filename));
-       if create_asm && not keep_asm then remove_file asm_filename
-    )
-
 let set_export_info (ulambda, prealloc, structured_constants, export) =
   Compilenv.set_export_info export;
   (ulambda, prealloc, structured_constants)
 
-let end_gen_implementation ?toplevel ~ppf_dump
+let end_gen_implementation ?toplevel prefixname
     (clambda:clambda_and_constants) =
-(*  let ch = open_out (file_prefix ^ ".clambda") in
-  let ppf = Format.formatter_of_out_channel ch in*)
+  let ch = open_out (prefixname ^ ".clambda") in
+  let ppf = Format.formatter_of_out_channel ch in
   let _ = toplevel in
   let sexp_string = Sexplib0.Sexp.to_string (Sexplib0.Sexp_conv.sexp_of_triple
     (Clambda_frontend.Clambda_types.sexp_of_ulambda)
@@ -185,10 +145,10 @@ let end_gen_implementation ?toplevel ~ppf_dump
     clambda)
   in
   (* instead of emitting Assembly, we just dump the Clambda sexps *)
-    Format.fprintf ppf_dump "%s" sexp_string
-(*    close_out ch*)
+    Format.fprintf ppf "%s" sexp_string;
+    close_out ch
 
-let flambda_gen_implementation ?toplevel ~backend ~ppf_dump
+let flambda_gen_implementation ?toplevel prefixname ~backend ~ppf_dump
     (program:Flambda.program) =
   let export = Build_export_info.build_transient ~backend program in
   let (clambda, preallocated, constants) =
@@ -213,10 +173,10 @@ let flambda_gen_implementation ?toplevel ~backend ~ppf_dump
         })
       (Symbol.Map.bindings constants)
   in
-  end_gen_implementation ?toplevel ~ppf_dump
+  end_gen_implementation ?toplevel prefixname
     (clambda, preallocated, constants)
 
-let lambda_gen_implementation ?toplevel ~backend ~ppf_dump
+let lambda_gen_implementation ?toplevel prefixname ~backend ~ppf_dump
     (lambda:Lambda.program) =
   let clambda =
     Closure.intro ~backend ~size:lambda.main_module_block_size lambda.code
@@ -241,7 +201,7 @@ let lambda_gen_implementation ?toplevel ~backend ~ppf_dump
   in
   Compilenv.clear_structured_constants ();
   raw_clambda_dump_if ppf_dump clambda_and_constants;
-  end_gen_implementation ?toplevel ~ppf_dump clambda_and_constants
+  end_gen_implementation ?toplevel prefixname clambda_and_constants
 
 let compile_implementation_gen ?toplevel prefixname
     ~required_globals ~ppf_dump gen_implementation program =
@@ -250,10 +210,10 @@ let compile_implementation_gen ?toplevel prefixname
     then prefixname ^ ext_asm
     else Filename.temp_file "camlasm" ext_asm
   in
-  compile_unit prefixname asmfile !keep_asm_file
+  Asmgen.compile_unit prefixname asmfile !keep_asm_file
       (prefixname ^ ext_obj) (fun () ->
         Ident.Set.iter Compilenv.require_global required_globals;
-        gen_implementation ?toplevel ~ppf_dump program)
+        gen_implementation ?toplevel prefixname ~ppf_dump program)
 
 let compile_implementation_clambda ?toplevel prefixname
     ~backend ~ppf_dump (program:Lambda.program) =
