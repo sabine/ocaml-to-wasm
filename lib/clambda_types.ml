@@ -477,3 +477,16 @@ type preallocated_constant = Clambda.preallocated_constant = {
   provenance : usymbol_provenance option;
 }
 [@@deriving sexp]
+
+
+let sexp_of_clambda_with_constants clambda = Sexplib0.Sexp_conv.sexp_of_triple
+  (sexp_of_ulambda)
+  (Sexplib0.Sexp_conv.sexp_of_list sexp_of_preallocated_block)
+  (Sexplib0.Sexp_conv.sexp_of_list sexp_of_preallocated_constant)
+  clambda
+let clambda_with_constants_of_sexp sexp = Hashtbl.clear ident_table;
+  Sexplib0.Sexp_conv.triple_of_sexp
+    (ulambda_of_sexp)
+    (Sexplib0.Sexp_conv.list_of_sexp preallocated_block_of_sexp)
+    (Sexplib0.Sexp_conv.list_of_sexp preallocated_constant_of_sexp)
+    sexp
