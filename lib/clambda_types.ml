@@ -84,6 +84,23 @@ type bigarray_layout = Lambda.bigarray_layout =
 (* Copied from typing/ident.mli *)
 
 type ident = Ident.t
+
+(* NOTE: before any attempt to deserialize a Clambda S-Expression, the ident_table needs to be refreshed! *)
+let ident_table = Hashtbl.create 17
+let get_ident ~ty:ty ~unique_name:unique_name ~name:name ~scope:scope =
+  match Hashtbl.find_opt ident_table unique_name with
+  | Some ident -> ident
+  | None ->
+      let new_ident = match ty with
+        | "Predef" -> Ident.create_predef name
+        | "Global" -> Ident.create_persistent name
+        | "Local" -> Ident.create_local name
+        | "Scoped" -> Ident.create_scoped ~scope:scope name
+        | _ -> failwith "Ident type not recognized."
+      in
+      Hashtbl.add ident_table unique_name new_ident;
+      new_ident
+
 let sexp_of_ident ident = Sexp.List [
   Sexp.Atom "Ident";
   Sexp.List [Sexp.Atom "type"; Sexp.Atom (
@@ -92,33 +109,20 @@ let sexp_of_ident ident = Sexp.List [
     if Ident.scope ident == Ident.highest_scope then "Local" else
     "Scoped")];
   Sexp.List [Sexp.Atom "name"; Sexplib0.Sexp_conv.sexp_of_string (Ident.name ident)];
+  Sexp.List [Sexp.Atom "unique_name"; Sexplib0.Sexp_conv.sexp_of_string (Ident.unique_toplevel_name ident)];
   Sexp.List [Sexp.Atom "scope"; Sexplib0.Sexp_conv.sexp_of_int (Ident.scope ident)];
 ]
 let ident_of_sexp sexp = match sexp with 
 | Sexp.List [
   Sexp.Atom "Ident";
-  Sexp.List [Sexp.Atom "type"; Sexp.Atom "Predef"];
-  Sexp.List [Sexp.Atom "name"; name];
-  Sexp.List [Sexp.Atom "scope"; _];
-] -> Ident.create_predef (Sexplib0.Sexp_conv.string_of_sexp name)
-| Sexp.List [
-  Sexp.Atom "Ident";
-  Sexp.List [Sexp.Atom "type"; Sexp.Atom "Global"];
-  Sexp.List [Sexp.Atom "name"; name];
-  Sexp.List [Sexp.Atom "scope"; _];
-] -> Ident.create_persistent (Sexplib0.Sexp_conv.string_of_sexp name)
-| Sexp.List [
-  Sexp.Atom "Ident";
-  Sexp.List [Sexp.Atom "type"; Sexp.Atom "Local"];
-  Sexp.List [Sexp.Atom "name"; name];
-  Sexp.List [Sexp.Atom "scope"; _];
-] -> Ident.create_local (Sexplib0.Sexp_conv.string_of_sexp name)
-| Sexp.List [
-  Sexp.Atom "Ident";
-  Sexp.List [Sexp.Atom "type"; Sexp.Atom "Scoped"];
-  Sexp.List [Sexp.Atom "name"; name];
-  Sexp.List [Sexp.Atom "scope"; scope];
-] -> Ident.create_scoped ~scope:(Sexplib0.Sexp_conv.int_of_sexp scope) (Sexplib0.Sexp_conv.string_of_sexp name)
+  Sexp.List [Sexp.Atom "type"; Sexp.Atom ty];
+  Sexp.List [Sexp.Atom "name"; Sexp.Atom name];
+  Sexp.List [Sexp.Atom "unique_name"; Sexp.Atom unique_name];
+  Sexp.List [Sexp.Atom "scope"; scope ];
+] -> get_ident ~ty:ty
+               ~unique_name:unique_name
+               ~name:name
+               ~scope:(Sexplib0.Sexp_conv.int_of_sexp scope)
 | _ -> failwith "S-Expression for Ident does not have the expected shape!"
 
 (* Copied from typing/types.mli *)
