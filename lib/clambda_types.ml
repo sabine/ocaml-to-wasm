@@ -84,23 +84,42 @@ type bigarray_layout = Lambda.bigarray_layout =
 (* Copied from typing/ident.mli *)
 
 type ident = Ident.t
-let sexp_of_ident _ = Sexp.Atom "TODO"
-let ident_of_sexp _ = failwith "TODO"
-
-(* Copied from middle_end/backend_var.mli *)
-
-type backend_var = ident
-[@@deriving sexp]
-
-type backend_var_with_provenance = Backend_var.With_provenance.t
-let sexp_of_backend_var_with_provenance _ = Sexp.Atom "TODO"
-let backend_var_with_provenance_of_sexp _ = failwith "TODO"
-
-(* Copied from lambda/debuginfo.mli *)
-
-type debuginfo = Debuginfo.t
-let sexp_of_debuginfo _ = Sexp.Atom "TODO"
-let debuginfo_of_sexp _ = failwith "TODO"
+let sexp_of_ident ident = Sexp.List [
+  Sexp.Atom "Ident";
+  Sexp.List [Sexp.Atom "type"; Sexp.Atom (
+    if Ident.is_predef ident then "Predef" else 
+    if Ident.global ident then "Global" else
+    if Ident.scope ident == Ident.highest_scope then "Local" else
+    "Scoped")];
+  Sexp.List [Sexp.Atom "name"; Sexplib0.Sexp_conv.sexp_of_string (Ident.name ident)];
+  Sexp.List [Sexp.Atom "scope"; Sexplib0.Sexp_conv.sexp_of_int (Ident.scope ident)];
+]
+let ident_of_sexp sexp = match sexp with 
+| Sexp.List [
+  Sexp.Atom "Ident";
+  Sexp.List [Sexp.Atom "type"; Sexp.Atom "Predef"];
+  Sexp.List [Sexp.Atom "name"; name];
+  Sexp.List [Sexp.Atom "scope"; _];
+] -> Ident.create_predef (Sexplib0.Sexp_conv.string_of_sexp name)
+| Sexp.List [
+  Sexp.Atom "Ident";
+  Sexp.List [Sexp.Atom "type"; Sexp.Atom "Global"];
+  Sexp.List [Sexp.Atom "name"; name];
+  Sexp.List [Sexp.Atom "scope"; _];
+] -> Ident.create_persistent (Sexplib0.Sexp_conv.string_of_sexp name)
+| Sexp.List [
+  Sexp.Atom "Ident";
+  Sexp.List [Sexp.Atom "type"; Sexp.Atom "Local"];
+  Sexp.List [Sexp.Atom "name"; name];
+  Sexp.List [Sexp.Atom "scope"; _];
+] -> Ident.create_local (Sexplib0.Sexp_conv.string_of_sexp name)
+| Sexp.List [
+  Sexp.Atom "Ident";
+  Sexp.List [Sexp.Atom "type"; Sexp.Atom "Scoped"];
+  Sexp.List [Sexp.Atom "name"; name];
+  Sexp.List [Sexp.Atom "scope"; scope];
+] -> Ident.create_scoped ~scope:(Sexplib0.Sexp_conv.int_of_sexp scope) (Sexplib0.Sexp_conv.string_of_sexp name)
+| _ -> failwith "S-Expression for Ident does not have the expected shape!"
 
 (* Copied from typing/types.mli *)
 
@@ -114,9 +133,69 @@ type record_representation = Types.record_representation =
     Record_regular            (* All fields are boxed / tagged *)
   | Record_float              (* All fields are floats *)
   | Record_unboxed of bool    (* Unboxed single-field record, inlined or not *)
-  | Record_inlined of int               (* Inlined record *)
-  | Record_extension of path          (* Inlined record under extension *)
+  | Record_inlined of int     (* Inlined record *)
+  | Record_extension of path  (* Inlined record under extension *)
 [@@deriving sexp]
+
+(* Copied from stdlib/lexing.mli *)
+
+(* Copied from parsing/location.mli *)
+
+type position = Lexing.position = {
+  pos_fname : string;
+  pos_lnum : int;
+  pos_bol : int;
+  pos_cnum : int;
+}
+[@@deriving sexp]
+
+type location = Location.t = {
+  loc_start: position;
+  loc_end: position;
+  loc_ghost: bool;
+}
+[@@deriving sexp]
+
+(* Copied from lambda/debuginfo.mli *)
+
+type debuginfo = Debuginfo.t
+let sexp_of_debuginfo debuginfo = sexp_of_location (Debuginfo.to_location debuginfo)
+let debuginfo_of_sexp sexp = Debuginfo.from_location (location_of_sexp sexp)
+
+(* Copied from middle_end/backend_var.mli *)
+
+type backend_var = ident
+[@@deriving sexp]
+
+type provenance = Backend_var.Provenance.t
+let sexp_of_provenance provenance = Sexp.List [
+  Sexp.Atom "Provenance";
+  Sexp.List [Sexp.Atom "module_path"; sexp_of_path (Backend_var.Provenance.module_path provenance)];
+  Sexp.List [Sexp.Atom "location"; sexp_of_debuginfo (Backend_var.Provenance.location provenance)];
+  Sexp.List [Sexp.Atom "original_ident"; sexp_of_ident (Backend_var.Provenance.original_ident provenance)];
+]
+let provenance_of_sexp sexp = match sexp with
+  | Sexp.List [
+    Sexp.Atom "Provenance";
+    Sexp.List [Sexp.Atom "module_path"; module_path];
+    Sexp.List [Sexp.Atom "location"; location];
+    Sexp.List [Sexp.Atom "original_ident"; original_ident];
+  ] -> Backend_var.Provenance.create ~module_path:(path_of_sexp module_path) ~location:(debuginfo_of_sexp location) ~original_ident:(ident_of_sexp original_ident)
+  | _ -> failwith "S-Expression of Provenance does not have the expected shape!"
+
+type backend_var_with_provenance = Backend_var.With_provenance.t
+let sexp_of_backend_var_with_provenance backendvar = Sexp.List [
+  Sexp.Atom "Backend_var_with_provenance";
+  Sexp.List [Sexp.Atom "var"; sexp_of_ident (Backend_var.With_provenance.var backendvar)];
+  Sexp.List [Sexp.Atom "provenance"; sexp_of_option sexp_of_provenance (Backend_var.With_provenance.provenance backendvar)];
+]
+let backend_var_with_provenance_of_sexp sexp = match sexp with
+  | Sexp.List [
+    Sexp.Atom "Backend_var_with_provenance";
+    Sexp.List [Sexp.Atom "var"; ident];
+    Sexp.List [Sexp.Atom "provenance"; provenance];
+  ] -> Backend_var.With_provenance.create ?provenance:(option_of_sexp provenance_of_sexp provenance) (ident_of_sexp ident)
+  | _ -> failwith "S-Expression for Backend_var_with_provenance does not have the expected shape!"
 
 (* Copied from typing/primitive.mli *)
 
@@ -134,8 +213,29 @@ type primitive_description = Primitive.description = private
     prim_native_name: string;  (* Name of C function for the nat. code gen. *)
     prim_native_repr_args: native_repr list;
     prim_native_repr_res: native_repr }
-let sexp_of_primitive_description _ = Sexp.Atom "TODO"
-let primitive_description_of_sexp _ = failwith "TODO"
+let sexp_of_primitive_description p = Sexp.List [
+  Sexp.Atom "Primitive_description";
+  Sexp.List [Sexp.Atom "prim_name"; Sexplib0.Sexp_conv.sexp_of_string p.prim_name];
+  Sexp.List [Sexp.Atom "prim_alloc"; Sexplib0.Sexp_conv.sexp_of_bool p.prim_alloc];
+  Sexp.List [Sexp.Atom "prim_native_name"; Sexplib0.Sexp_conv.sexp_of_string p.prim_native_name];
+  Sexp.List [Sexp.Atom "prim_native_repr_args"; Sexplib0.Sexp_conv.sexp_of_list sexp_of_native_repr p.prim_native_repr_args];
+  Sexp.List [Sexp.Atom "prim_native_repr_res"; sexp_of_native_repr p.prim_native_repr_res];
+]
+let primitive_description_of_sexp sexp = match sexp with
+| Sexp.List [
+  Sexp.List [Sexp.Atom "prim_name"; prim_name];
+  Sexp.List [Sexp.Atom "prim_alloc"; prim_alloc];
+  Sexp.List [Sexp.Atom "prim_native_name"; prim_native_name];
+  Sexp.List [Sexp.Atom "prim_native_repr_args"; prim_native_repr_args];
+  Sexp.List [Sexp.Atom "prim_native_repr_res"; prim_native_repr_res];
+] -> Primitive.make
+  ~name:(Sexplib0.Sexp_conv.string_of_sexp prim_name)
+  ~alloc:(Sexplib0.Sexp_conv.bool_of_sexp prim_alloc)
+  ~native_name:(Sexplib0.Sexp_conv.string_of_sexp prim_native_name)
+  ~native_repr_args:(Sexplib0.Sexp_conv.list_of_sexp native_repr_of_sexp prim_native_repr_args)
+  ~native_repr_res:(native_repr_of_sexp prim_native_repr_res)
+| _ ->
+  failwith "S-Expression for Primitive_description does not have the expected shape!"
 
 (* Copied from middle_end/clambda_primitives.mli *)
 
