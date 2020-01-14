@@ -139,8 +139,6 @@ type record_representation = Types.record_representation =
 
 (* Copied from stdlib/lexing.mli *)
 
-(* Copied from parsing/location.mli *)
-
 type position = Lexing.position = {
   pos_fname : string;
   pos_lnum : int;
@@ -148,6 +146,8 @@ type position = Lexing.position = {
   pos_cnum : int;
 }
 [@@deriving sexp]
+
+(* Copied from parsing/location.mli *)
 
 type location = Location.t = {
   loc_start: position;
