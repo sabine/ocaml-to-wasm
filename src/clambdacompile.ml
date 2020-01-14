@@ -1,3 +1,5 @@
+(* NOTE: this is all very ugly, partly due to using the version of the compiler that I did. When we upgrade to a more recent OCaml compiler version, it is best to redo this completely, since these parts of the OCaml compiler have been refactored in a more recent version. *)
+
 (**************************************************************************)
 (*                                                                        *)
 (*                                 OCaml                                  *)
