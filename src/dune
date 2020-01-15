@@ -1,7 +1,10 @@
+(copy_files# ocaml_to_clambda/*.{ml,mli})
+
 (executable
  (name ocaml_to_clambda)
  (modules ocaml_to_clambda clambdacompile)
  (libraries ocaml-compiler-libs.optcomp clambda_frontend))
+
 
 (executable
  (name clambda_to_wasm)
