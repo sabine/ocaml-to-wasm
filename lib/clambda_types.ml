@@ -87,7 +87,7 @@ type ident = Ident.t
 
 (* NOTE: before any attempt to deserialize a Clambda S-Expression, the ident_table needs to be refreshed! *)
 let ident_table = Hashtbl.create 17
-let get_ident ~ty:ty ~unique_name:unique_name ~name:name ~scope:scope =
+let get_ident ~ty ~unique_name ~name ~scope =
   match Hashtbl.find_opt ident_table unique_name with
   | Some ident -> ident
   | None ->
@@ -119,9 +119,7 @@ let ident_of_sexp sexp = match sexp with
   Sexp.List [Sexp.Atom "name"; Sexp.Atom name];
   Sexp.List [Sexp.Atom "unique_name"; Sexp.Atom unique_name];
   Sexp.List [Sexp.Atom "scope"; scope ];
-] -> get_ident ~ty:ty
-               ~unique_name:unique_name
-               ~name:name
+] -> get_ident ~ty ~unique_name ~name
                ~scope:(Sexplib0.Sexp_conv.int_of_sexp scope)
 | _ -> failwith "S-Expression for Ident does not have the expected shape!"
 
