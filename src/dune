@@ -9,4 +9,4 @@
 (executable
  (name clambda_to_wasm)
  (modules clambda_to_wasm)
- (libraries ocaml-compiler-libs.optcomp clambda_frontend sexplib))
+ (libraries ocaml-compiler-libs.optcomp clambda_frontend sexplib ir))
