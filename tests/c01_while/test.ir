@@ -1,0 +1,43 @@
+(IRSequence
+ (IRLet Immutable
+  (Backend_var_with_provenance
+   (var (Ident (type Local) (name b) (unique_name b/3) (scope 100000000)))
+   (provenance ()))
+  (IRprim (Pmakeblock 0 Mutable ((Pintval))) ((IRconst (Uconst_int 10)))))
+ (IRSequence
+  (IRSequence
+   (IRLoop (Block 1)
+    (IRSequence
+     (IRBr_if_not
+      (IRprim (Pintcomp Cgt)
+       ((IRprim (Pfield 0)
+         ((IRprim (Pfield 0) ((IRprim (Pread_symbol camlTest) ())))))
+        (IRconst (Uconst_int 0))))
+      (Block 1))
+     (IRprim (Psetfield 0 Immediate Assignment)
+      ((IRprim (Pfield 0) ((IRprim (Pread_symbol camlTest) ())))
+       (IRprim Psubint
+        ((IRprim (Pfield 0)
+          ((IRprim (Pfield 0) ((IRprim (Pread_symbol camlTest) ())))))
+         (IRconst (Uconst_int 1))))))))
+   (IRconst (Uconst_ptr 0)))
+  (IRSequence
+   (IRLet Immutable
+    (Backend_var_with_provenance
+     (var (Ident (type Local) (name a) (unique_name a/4) (scope 100000000)))
+     (provenance ()))
+    (IRLoop (Block 2)
+     (IRSequence
+      (IRBr_if_not
+       (IRprim (Pintcomp Cgt)
+        ((IRprim (Pfield 0)
+          ((IRprim (Pfield 0) ((IRprim (Pread_symbol camlTest) ())))))
+         (IRconst (Uconst_int 0))))
+       (Block 2))
+      (IRprim (Psetfield 0 Immediate Assignment)
+       ((IRprim (Pfield 0) ((IRprim (Pread_symbol camlTest) ())))
+        (IRprim Psubint
+         ((IRprim (Pfield 0)
+           ((IRprim (Pfield 0) ((IRprim (Pread_symbol camlTest) ())))))
+          (IRconst (Uconst_int 1)))))))))
+   (IRconst (Uconst_ptr 0)))))()

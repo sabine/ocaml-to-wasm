@@ -1,0 +1,141 @@
+(IRSequence
+ (IRlet Immutable Pgenval
+  (Backend_var_with_provenance
+   (var (Ident (type Local) (name h) (unique_name h/3) (scope 100000000)))
+   (provenance ()))
+  (IRprim (Pmakeblock 0 Mutable ((Pintval))) ((IRconst (Uconst_int 4))))
+  (IRprim (Psetfield 0 Pointer Root_initialization)
+   ((IRprim (Pread_symbol camlTest) ())
+    (IRvar (Ident (type Local) (name h) (unique_name h/3) (scope 100000000))))))
+ (IRSequence
+  (IRlet Immutable Pgenval
+   (Backend_var_with_provenance
+    (var (Ident (type Local) (name f) (unique_name f/4) (scope 100000000)))
+    (provenance ()))
+   (IRlet Immutable Pgenval
+    (Backend_var_with_provenance
+     (var
+      (Ident (type Local) (name arg) (unique_name arg/5) (scope 100000000)))
+     (provenance ()))
+    (IRprim (Pfield 0)
+     ((IRprim (Pfield 0) ((IRprim (Pread_symbol camlTest) ())))))
+    (IRlet Immutable Pgenval
+     (Backend_var_with_provenance
+      (var
+       (Ident (type Local) (name funct) (unique_name funct/6)
+        (scope 100000000)))
+      (provenance ()))
+     (IRfunction_symbol (Function camlTest__fun_90))
+     (IRfunction_symbol (Function camlTest__fun_95))))
+   (IRprim (Psetfield 1 Pointer Root_initialization)
+    ((IRprim (Pread_symbol camlTest) ())
+     (IRvar
+      (Ident (type Local) (name f) (unique_name f/4) (scope 100000000))))))
+  (IRSequence
+   (IRlet Immutable Pgenval
+    (Backend_var_with_provenance
+     (var (Ident (type Local) (name g) (unique_name g/13) (scope 100000000)))
+     (provenance ()))
+    (IRfunction_symbol (Function camlTest__g_82))
+    (IRprim (Psetfield 2 Pointer Root_initialization)
+     ((IRprim (Pread_symbol camlTest) ())
+      (IRvar
+       (Ident (type Local) (name g) (unique_name g/13) (scope 100000000))))))
+   (IRconst (Uconst_ptr 0)))))
+
+(((fun_name (Function camlTest__fun_90))
+                                (fun_args
+                                 (((Backend_var_with_provenance
+                                    (var
+                                     (Ident (type Local) (name prim)
+                                      (unique_name prim/7) (scope 100000000)))
+                                    (provenance ()))
+                                   Pgenval)
+                                  ((Backend_var_with_provenance
+                                    (var
+                                     (Ident (type Local) (name prim)
+                                      (unique_name prim/8) (scope 100000000)))
+                                    (provenance ()))
+                                   Pgenval)))
+                                (fun_body
+                                 (IRprim Paddint
+                                  ((IRvar
+                                    (Ident (type Local) (name prim)
+                                     (unique_name prim/7) (scope 100000000)))
+                                   (IRvar
+                                    (Ident (type Local) (name prim)
+                                     (unique_name prim/8) (scope 100000000)))))))
+                               ((fun_name (Function camlTest__fun_95))
+                                (fun_args
+                                 (((Backend_var_with_provenance
+                                    (var
+                                     (Ident (type Local) (name arg)
+                                      (unique_name arg/10) (scope 100000000)))
+                                    (provenance ()))
+                                   Pgenval)
+                                  ((Backend_var_with_provenance
+                                    (var
+                                     (Ident (type Local) (name env)
+                                      (unique_name env/11) (scope 100000000)))
+                                    (provenance ()))
+                                   Pgenval)))
+                                (fun_body
+                                 (IRlet Immutable Pgenval
+                                  (Backend_var_with_provenance
+                                   (var
+                                    (Ident (type Local) (name prim)
+                                     (unique_name prim/12) (scope 100000000)))
+                                   (provenance ()))
+                                  (IRprim (Pfield 2)
+                                   ((IRvar
+                                     (Ident (type Local) (name env)
+                                      (unique_name env/11) (scope 100000000)))))
+                                  (IRprim Paddint
+                                   ((IRvar
+                                     (Ident (type Local) (name prim)
+                                      (unique_name prim/12)
+                                      (scope 100000000)))
+                                    (IRvar
+                                     (Ident (type Local) (name arg)
+                                      (unique_name arg/10) (scope 100000000))))))))
+                               ((fun_name (Function camlTest__g_82))
+                                (fun_args
+                                 (((Backend_var_with_provenance
+                                    (var
+                                     (Ident (type Local) (name x)
+                                      (unique_name x/14) (scope 100000000)))
+                                    (provenance ()))
+                                   Pgenval)
+                                  ((Backend_var_with_provenance
+                                    (var
+                                     (Ident (type Local) (name y)
+                                      (unique_name y/15) (scope 100000000)))
+                                    (provenance ()))
+                                   Pgenval)))
+                                (fun_body
+                                 (IRlet Immutable Pgenval
+                                  (Backend_var_with_provenance
+                                   (var
+                                    (Ident (type Local) (name env)
+                                     (unique_name env/16) (scope 100000000)))
+                                   (provenance ()))
+                                  (IRprim (Pfield 1)
+                                   ((IRprim (Pread_symbol camlTest) ())))
+                                  (IRlet Immutable Pgenval
+                                   (Backend_var_with_provenance
+                                    (var
+                                     (Ident (type Local) (name prim)
+                                      (unique_name prim/17)
+                                      (scope 100000000)))
+                                    (provenance ()))
+                                   (IRprim (Pfield 2)
+                                    ((IRvar
+                                      (Ident (type Local) (name env)
+                                       (unique_name env/16)
+                                       (scope 100000000)))))
+                                   (IRprim Paddint
+                                    ((IRvar
+                                      (Ident (type Local) (name prim)
+                                       (unique_name prim/17)
+                                       (scope 100000000)))
+                                     (IRconst (Uconst_int 3)))))))))

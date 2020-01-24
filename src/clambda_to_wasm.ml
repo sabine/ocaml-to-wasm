@@ -8,14 +8,17 @@ let main () =
   let (clambda, _, _) = Clambda_frontend.Clambda_types.clambda_with_constants_of_sexp (Sexplib.Sexp.of_string sexp_string)
   in
   close_in ic;
-  Sexplib0.Sexp.pp_hum_indent 2 ppf_dump (Sexplib.Sexp.of_string sexp_string);
+  (*Sexplib0.Sexp.pp_hum_indent 1 ppf_dump (Sexplib.Sexp.of_string sexp_string);*)
 
-  Format.fprintf ppf_dump "\nclambda_to_wasm understands this as:\n\n";
   Printclambda.clambda ppf_dump clambda;
 
-  let instruction_list = Ir.clambda_to_instruction_list clambda []
-  in
-  Format.fprintf ppf_dump "\nIR: %s\n" (Sexplib.Sexp.to_string (Sexplib0.Sexp_conv.sexp_of_list Ir.sexp_of_instruction instruction_list))
+  let (ir, fundecls) = Ir.transl clambda in
+  let oc = open_out Sys.argv.(2) in
+  let ppf = Format.formatter_of_out_channel oc in
+  Sexplib0.Sexp.pp_hum_indent 1 ppf (Ir.sexp_of_expression ir);
+  Printf.fprintf oc "\n\n";
+  Sexplib0.Sexp.pp_hum_indent 1 ppf (Sexplib.Conv.sexp_of_list Ir.sexp_of_fundecl fundecls);
+  close_out oc
 
 let () =
   main ();

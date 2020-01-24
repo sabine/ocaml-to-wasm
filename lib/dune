@@ -8,5 +8,5 @@
 (library
  (name ir)
  (modules ir)
- (libraries ppx_sexp_conv.runtime-lib clambda_frontend)
+ (libraries ppx_sexp_conv.runtime-lib clambda_frontend sexplib)
  (preprocess (pps ppx_sexp_conv)))
