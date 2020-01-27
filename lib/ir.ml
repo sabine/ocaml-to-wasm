@@ -59,19 +59,19 @@ let new_block_symbol =
 
 type expression = 
   | IRlet of mutable_flag * value_kind * backend_var_with_provenance
-      * expression * expression
+      * expression * expression list
   | IRprim of primitive * expression list
   | IRconst of uconstant
   | IRvar of backend_var
   | IRfunction_symbol of function_symbol
+  | IRclosure of function_symbol * int * expression list
   
   (*
   | IRUnreachable*)
   | IRNop 
-  | IRSequence of expression * expression
-  | IRBlock of block_symbol * expression
-  | IRLoop of block_symbol * expression
-  | IRIf of expression * expression * expression 
+  | IRBlock of block_symbol * expression list
+  | IRLoop of block_symbol * expression list
+  | IRIf of expression * expression list * expression list 
   | IRBr of block_symbol
   | IRBr_if of expression * block_symbol
   | IRBr_if_not of expression * block_symbol
@@ -84,46 +84,76 @@ and
 fundecl =
   { fun_name: function_symbol;
     fun_args: (backend_var_with_provenance * value_kind) list;
-    fun_body: expression;
+    fun_body: expression list;
   }
 [@@deriving sexp]
+
+
+(* Record application and currying functions *)
+
+let apply_function_sym n =
+  Compilenv.need_apply_fun n; Function ("caml_apply" ^ Int.to_string n)
+let curry_function_sym n =
+  Compilenv.need_curry_fun n;
+  if n >= 0
+  then Function ("caml_curry" ^ Int.to_string n)
+  else Function ("caml_tuplify" ^ Int.to_string (-n))
 
 
 let rec transl clambda = match clambda with
   | Usequence (instr, clambda') -> 
     let (instr_t, instr_fundecls) = transl instr in
     let (clambda'_t, clambda'_fundecls) = transl clambda' in
-    IRSequence (instr_t, clambda'_t), instr_fundecls @ clambda'_fundecls
+    instr_t @ clambda'_t, instr_fundecls @ clambda'_fundecls
 
-  | Uvar (backend_var) -> IRvar backend_var, []
+  | Uvar (backend_var) -> [IRvar backend_var], []
 
   | Ulet (mutable_flag, value_kind, backend_var_with_provenance, exp, body) -> 
     let (body_t, body_fundecls) = transl body in
     let (exp_t, exp_fundecls) = transl exp in
-    IRlet (mutable_flag, value_kind, backend_var_with_provenance, exp_t, body_t), exp_fundecls @ body_fundecls
+    [IRlet (mutable_flag, value_kind, backend_var_with_provenance, List.hd exp_t, body_t)], exp_fundecls @ body_fundecls
 
   | Uprim (prim, args, _debug) -> 
     let tr = List.map transl args in
     let (args_t, fundecls) = List.split tr in
-    IRprim (prim, args_t), List.concat fundecls
+    [IRprim (prim, List.concat args_t)], List.concat fundecls
 
-  | Uconst (const) -> IRconst const, []
+  | Uconst (const) -> [IRconst const], []
  
-  | Uclosure (ufunction::[], _env) ->
-    let (body_t, body_fundecls) = transl ufunction.body in
-    IRfunction_symbol (Function ufunction.label), [{
-      fun_name = Function ufunction.label;
-      fun_args = ufunction.params;
-      fun_body = body_t;
-    }] @ body_fundecls
+  | Uclosure (ufunction::[], []) ->
+    let fundecls_t = transl_fundecl ufunction in
+    [IRfunction_symbol (Function ufunction.label)], fundecls_t
+
+  | Uclosure(fundecls, clos_vars) ->
+    let rec transl_fundecls = function
+      [] ->
+        let (clos_t, fundecls_t) = List.split (List.map transl clos_vars) in
+        List.concat clos_t, List.concat fundecls_t
+      | f :: rem ->
+        let (rem_t, rem_fundecls_t) = transl_fundecls rem in
+        if f.arity = 1 || f.arity = 0 then
+          [IRclosure (Function f.label, f.arity, rem_t)], transl_fundecl f @ rem_fundecls_t
+        else
+          [IRclosure (curry_function_sym f.arity, f.arity, IRfunction_symbol (Function f.label) :: rem_t)], transl_fundecl f @ rem_fundecls_t
+    in
+    let (clos_t, fundecls_t) = transl_fundecls fundecls in
+    clos_t, fundecls_t
+
 
   | Uwhile (cond, body) ->
     let block_symbol = new_block_symbol () in
     let (cond_t, cond_fundecls) = transl cond in
     let (body_t, body_fundecls) = transl body in
-    IRLoop (block_symbol, IRSequence (
-            IRBr_if_not (cond_t, block_symbol),
-            body_t
-            )), cond_fundecls @ body_fundecls
+    [IRLoop (block_symbol, [
+            IRBr_if_not (List.hd cond_t, block_symbol)]
+            @ body_t
+            )], cond_fundecls @ body_fundecls
   
   | _ -> failwith (Format.sprintf "transl not implemented: %s" (Sexplib.Sexp.to_string_hum ~indent:1 (sexp_of_ulambda clambda)))
+and transl_fundecl ufunction = 
+  let (body_t, body_fundecls) = transl ufunction.body in
+  {
+    fun_name = Function ufunction.label;
+    fun_args = ufunction.params;
+    fun_body = body_t;
+  } :: body_fundecls

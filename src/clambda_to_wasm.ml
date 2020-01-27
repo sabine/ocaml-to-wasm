@@ -15,7 +15,7 @@ let main () =
   let (ir, fundecls) = Ir.transl clambda in
   let oc = open_out Sys.argv.(2) in
   let ppf = Format.formatter_of_out_channel oc in
-  Sexplib0.Sexp.pp_hum_indent 1 ppf (Ir.sexp_of_expression ir);
+  Sexplib0.Sexp.pp_hum_indent 1 ppf (Sexplib.Conv.sexp_of_list Ir.sexp_of_expression ir);
   Printf.fprintf oc "\n\n";
   Sexplib0.Sexp.pp_hum_indent 1 ppf (Sexplib.Conv.sexp_of_list Ir.sexp_of_fundecl fundecls);
   close_out oc
