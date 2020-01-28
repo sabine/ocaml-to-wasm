@@ -1,3 +1,0 @@
-((IRprim (Psetfield 0 Pointer Root_initialization)
-  ((ExPrim (Pread_symbol camlTest) ()) (ExConst (Uconst_int 11))))
- (IRConst (Uconst_ptr 0)))

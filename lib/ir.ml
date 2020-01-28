@@ -39,7 +39,7 @@ type ulambda =
 
 type   block_symbol = Block of int
 [@@deriving sexp]
-type function_symbol = Function of string
+type    function_symbol = Function of string
 [@@deriving sexp]
 type    local_symbol = Local of string
 [@@deriving sexp]
@@ -56,28 +56,26 @@ let new_block_symbol =
   let last = ref 0 in 
   fun () -> incr last ; Block !last
 
-
 type expression = 
   | IRlet of mutable_flag * value_kind * backend_var_with_provenance
       * expression * expression list
   | IRprim of primitive * expression list
   | IRconst of uconstant
   | IRvar of backend_var
-  | IRfunction_symbol of function_symbol
-  | IRclosure of function_symbol * int * expression list
+  | IRFunction of ir_function
   
   (*
   | IRUnreachable*)
   | IRNop 
   | IRBlock of block_symbol * expression list
   | IRLoop of block_symbol * expression list
-  | IRIf of expression * expression list * expression list 
+  | IRIf of expression * expression list * expression list
   | IRBr of block_symbol
   | IRBr_if of expression * block_symbol
   | IRBr_if_not of expression * block_symbol
   (*| IRBr_table of block_symbol list * block_symbol*)
   | IRReturn
-  | IRCall of function_symbol
+  | IRCall of ir_function
   | IRCall_indirect of expression * type_symbol
 [@@deriving sexp]
 and
@@ -87,6 +85,13 @@ fundecl =
     fun_body: expression list;
   }
 [@@deriving sexp]
+and
+ir_function =
+  | Function_symbol of function_symbol
+  | Closure of function_symbol * arity * closure_argument list (* invariant: length of argument list is shorter than arity of the closure *)
+[@@deriving sexp]
+and arity = int
+and closure_argument = expression list
 
 
 (* Record application and currying functions *)
@@ -122,22 +127,23 @@ let rec transl clambda = match clambda with
  
   | Uclosure (ufunction::[], []) ->
     let fundecls_t = transl_fundecl ufunction in
-    [IRfunction_symbol (Function ufunction.label)], fundecls_t
+    [IRFunction (Function_symbol (Function ufunction.label))], fundecls_t
 
   | Uclosure(fundecls, clos_vars) ->
     let rec transl_fundecls = function
       [] ->
         let (clos_t, fundecls_t) = List.split (List.map transl clos_vars) in
-        List.concat clos_t, List.concat fundecls_t
+        (* This is most likely wrong, the clos_t should not be flattened, since the individual results of evaluating the expressions need to be assigned into the closure value somehow *)
+        clos_t, List.concat fundecls_t
       | f :: rem ->
         let (rem_t, rem_fundecls_t) = transl_fundecls rem in
         if f.arity = 1 || f.arity = 0 then
-          [IRclosure (Function f.label, f.arity, rem_t)], transl_fundecl f @ rem_fundecls_t
+          [[IRFunction (Closure (Function f.label, f.arity, rem_t))]], transl_fundecl f @ rem_fundecls_t
         else
-          [IRclosure (curry_function_sym f.arity, f.arity, IRfunction_symbol (Function f.label) :: rem_t)], transl_fundecl f @ rem_fundecls_t
+          [[IRFunction (Closure (curry_function_sym f.arity, f.arity, [IRFunction (Function_symbol (Function f.label))] :: rem_t))]], transl_fundecl f @ rem_fundecls_t
     in
     let (clos_t, fundecls_t) = transl_fundecls fundecls in
-    clos_t, fundecls_t
+    List.concat clos_t, fundecls_t
 
 
   | Uwhile (cond, body) ->

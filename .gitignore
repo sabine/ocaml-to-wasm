@@ -9,6 +9,9 @@
 *.cmxa
 *.swp
 *.clambda
+*.cmm
+*.ir
+*.out
 
 # ocamlbuild working directory
 _build/
