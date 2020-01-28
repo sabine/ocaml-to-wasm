@@ -133,7 +133,6 @@ let rec transl clambda = match clambda with
     let rec transl_fundecls = function
       [] ->
         let (clos_t, fundecls_t) = List.split (List.map transl clos_vars) in
-        (* This is most likely wrong, the clos_t should not be flattened, since the individual results of evaluating the expressions need to be assigned into the closure value somehow *)
         clos_t, List.concat fundecls_t
       | f :: rem ->
         let (rem_t, rem_fundecls_t) = transl_fundecls rem in
