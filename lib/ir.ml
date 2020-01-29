@@ -63,6 +63,7 @@ type expression =
   | IRconst of uconstant
   | IRvar of backend_var
   | IRFunction of ir_function
+  | IRApply of ir_function * expression list
   
   (*
   | IRUnreachable*)
@@ -162,3 +163,16 @@ and transl_fundecl ufunction =
     fun_args = ufunction.params;
     fun_body = body_t;
   } :: body_fundecls
+
+let caml_apply3 arg1 arg2 arg3 closure =
+  let (f, arity, args) = closure in
+  if arity == 3 then
+  (* what do we pass here? It must be a reference to the closure, but I don't think I have one. *)
+    [IRApply (f, [arg1; arg2; arg3; closure])]
+  else
+    let clos2 = Ident.create_local "clos2" in
+    let clos3 = Ident.create_local "clos3" in
+    (* TODO: find out what to do here, obviously we don't pass the closure value, but instead the identifier we created *)
+    [IRLet (Immutable, dfdf, clos2, IRApply (closure, [arg1; closure]));
+    IRLet (Immutable, dfdf, clos3, IRApply (clos2, [arg2; clos2]));
+    IRApply (clos3, [arg3; clos3])]
