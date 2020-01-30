@@ -60,7 +60,7 @@ type expression =
   | IRlet of mutable_flag * value_kind * backend_var_with_provenance
       * expression * expression list
   | IRprim of primitive * expression list
-  | IRconst of uconstant
+  | IRconst of constant
   | IRvar of backend_var
   | IRFunction of ir_function
   | IRApply of ir_function * expression list
@@ -87,12 +87,30 @@ fundecl =
   }
 [@@deriving sexp]
 and
+structured_constant =
+  | IRconst_float of float
+  | IRconst_int32 of int32
+  | IRconst_int64 of int64
+  | IRconst_nativeint of nativeint
+  | IRconst_block of int * uconstant list
+  | IRconst_float_array of float list
+  | IRconst_string of string
+  | IRconst_function of ir_function
+[@@deriving sexp]
+and  
+constant = 
+  | IRconst_ref of string * structured_constant option
+  | IRconst_int of int
+(*  | IRconst_ptr of int*)
+[@@deriving sexp]
+and
 ir_function =
   | Function_symbol of function_symbol
   | Closure of function_symbol * arity * closure_argument list (* invariant: length of argument list is shorter than arity of the closure *)
 [@@deriving sexp]
 and arity = int
-and closure_argument = expression list
+and closure_argument = constant
+
 
 
 (* Record application and currying functions *)
@@ -124,7 +142,7 @@ let rec transl clambda = match clambda with
     let (args_t, fundecls) = List.split tr in
     [IRprim (prim, List.concat args_t)], List.concat fundecls
 
-  | Uconst (const) -> [IRconst const], []
+  | Uconst (const) -> transl_const const
  
   | Uclosure (ufunction::[], []) ->
     let fundecls_t = transl_fundecl ufunction in
@@ -156,6 +174,26 @@ let rec transl clambda = match clambda with
             )], cond_fundecls @ body_fundecls
   
   | _ -> failwith (Format.sprintf "transl not implemented: %s" (Sexplib.Sexp.to_string_hum ~indent:1 (sexp_of_ulambda clambda)))
+and transl_const uconstant = 
+  let transl_structured_const c = match c with 
+    | Uconst_float f -> IRconst_float f
+    | Uconst_int32 i32 -> IRconst_int32 i32
+    | Uconst_int64 i64 -> IRconst_int64 i64
+    | Uconst_nativeint i -> IRconst_nativeint i
+    | Uconst_block (i, consts) -> IRconst_block (i, List.map transl_const consts)
+    | Uconst_float_array float_list -> IRconst_float_array (List.map transl_const float_list)
+    | Uconst_string s -> IRconst_string s
+    | Uconst_function f -> IRconst_function f
+  in
+  match const with
+    | Uconst_ref (name, const_opt) -> 
+      let const_opt_t = match const_opt with
+        | None -> None
+        | Some c -> transl_structured_const c
+      in 
+      [IRconst(IRconst_ref (name, const_opt_t))], []
+    | Uconst_int i -> [IRconst (IRconst_int i)], []
+    | Uconst_ptr i -> failwith "I don't know what to do with ptr"
 and transl_fundecl ufunction = 
   let (body_t, body_fundecls) = transl ufunction.body in
   {
@@ -165,9 +203,8 @@ and transl_fundecl ufunction =
   } :: body_fundecls
 
 let caml_apply3 arg1 arg2 arg3 closure =
-  let (f, arity, args) = closure in
+  let Closure (f, arity, args) = closure in
   if arity == 3 then
-  (* what do we pass here? It must be a reference to the closure, but I don't think I have one. *)
     [IRApply (f, [arg1; arg2; arg3; closure])]
   else
     let clos2 = Ident.create_local "clos2" in
