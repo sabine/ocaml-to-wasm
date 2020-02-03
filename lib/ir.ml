@@ -62,9 +62,10 @@ type expression =
   | IRprim of primitive * expression list
   | IRconst of constant
   | IRvar of backend_var
-  | IRFunction of ir_function
-  | IRApply of ir_function * expression list
+  | IRapply of ir_function * expression list
   
+  | IRalloc of block
+
   (*
   | IRUnreachable*)
   | IRNop 
@@ -79,6 +80,8 @@ type expression =
   | IRCall of ir_function
   | IRCall_indirect of expression * type_symbol
 [@@deriving sexp]
+and block =
+  TODO
 and
 fundecl =
   { fun_name: function_symbol;
@@ -87,22 +90,25 @@ fundecl =
   }
 [@@deriving sexp]
 and
-structured_constant =
+constant =
   | IRconst_float of float
   | IRconst_int32 of int32
   | IRconst_int64 of int64
   | IRconst_nativeint of nativeint
-  | IRconst_block of int * uconstant list
+  | IRconst_block of int * constant list
   | IRconst_float_array of float list
   | IRconst_string of string
+
   | IRconst_function of ir_function
+  | IRconst_ref of string * constant option
+  | IRconst_int of int
 [@@deriving sexp]
-and  
+(*and  
 constant = 
   | IRconst_ref of string * structured_constant option
   | IRconst_int of int
-(*  | IRconst_ptr of int*)
-[@@deriving sexp]
+  | IRconst_ptr of int
+[@@deriving sexp]*)
 and
 ir_function =
   | Function_symbol of function_symbol
@@ -142,26 +148,14 @@ let rec transl clambda = match clambda with
     let (args_t, fundecls) = List.split tr in
     [IRprim (prim, List.concat args_t)], List.concat fundecls
 
-  | Uconst (const) -> transl_const const
+  | Uconst (const) -> [IRconst (transl_const const)], []
  
   | Uclosure (ufunction::[], []) ->
     let fundecls_t = transl_fundecl ufunction in
-    [IRFunction (Function_symbol (Function ufunction.label))], fundecls_t
+    [IRconst (IRconst_function(Function_symbol (Function ufunction.label)))], fundecls_t
 
   | Uclosure(fundecls, clos_vars) ->
-    let rec transl_fundecls = function
-      [] ->
-        let (clos_t, fundecls_t) = List.split (List.map transl clos_vars) in
-        clos_t, List.concat fundecls_t
-      | f :: rem ->
-        let (rem_t, rem_fundecls_t) = transl_fundecls rem in
-        if f.arity = 1 || f.arity = 0 then
-          [[IRFunction (Closure (Function f.label, f.arity, rem_t))]], transl_fundecl f @ rem_fundecls_t
-        else
-          [[IRFunction (Closure (curry_function_sym f.arity, f.arity, [IRFunction (Function_symbol (Function f.label))] :: rem_t))]], transl_fundecl f @ rem_fundecls_t
-    in
-    let (clos_t, fundecls_t) = transl_fundecls fundecls in
-    List.concat clos_t, fundecls_t
+    transl_closure fundecls clos_vars
 
 
   | Uwhile (cond, body) ->
@@ -174,6 +168,33 @@ let rec transl clambda = match clambda with
             )], cond_fundecls @ body_fundecls
   
   | _ -> failwith (Format.sprintf "transl not implemented: %s" (Sexplib.Sexp.to_string_hum ~indent:1 (sexp_of_ulambda clambda)))
+  
+and transl_closure fundecls clos_vars =
+  let rec transl_fundecls = function
+    [] ->
+      let (clos_t, fundecls_t) = List.split (List.map transl clos_vars) in
+      clos_t, List.concat fundecls_t
+    | f :: rem ->
+      let (rem_t, rem_fundecls_t) = transl_fundecls rem in
+      let rec to_const ls = match ls with
+        | [] -> []
+        | x :: xs -> 
+            let c = match x with
+              | [y] -> (match y with
+                | IRconst z -> z
+                | _ -> failwith "to_const applied to something that is not a constant")
+              | _ -> failwith "to_const applied to something that is not a list with up to one element"
+            in
+            c :: to_const xs
+      in
+      if f.arity = 1 || f.arity = 0 then
+        [[IRconst (IRconst_function (Closure (Function f.label, f.arity, to_const rem_t)))]], transl_fundecl f @ rem_fundecls_t
+      else
+      [[IRconst (IRconst_function (Closure (curry_function_sym f.arity, f.arity, IRconst_function (Function_symbol (Function f.label)) :: to_const rem_t)))]], transl_fundecl f @ rem_fundecls_t
+  in
+  let (clos_t, fundecls_t) = transl_fundecls fundecls in
+  List.concat clos_t, fundecls_t
+
 and transl_const uconstant = 
   let transl_structured_const c = match c with 
     | Uconst_float f -> IRconst_float f
@@ -181,19 +202,20 @@ and transl_const uconstant =
     | Uconst_int64 i64 -> IRconst_int64 i64
     | Uconst_nativeint i -> IRconst_nativeint i
     | Uconst_block (i, consts) -> IRconst_block (i, List.map transl_const consts)
-    | Uconst_float_array float_list -> IRconst_float_array (List.map transl_const float_list)
+    | Uconst_float_array float_list -> IRconst_float_array float_list
     | Uconst_string s -> IRconst_string s
-    | Uconst_function f -> IRconst_function f
+    | Uconst_closure (_fundecls, _name, _args) ->
+      IRconst_function (Function_symbol (Function "TODO"))
   in
-  match const with
+  match uconstant with
     | Uconst_ref (name, const_opt) -> 
       let const_opt_t = match const_opt with
         | None -> None
-        | Some c -> transl_structured_const c
+        | Some c -> Some (transl_structured_const c)
       in 
-      [IRconst(IRconst_ref (name, const_opt_t))], []
-    | Uconst_int i -> [IRconst (IRconst_int i)], []
-    | Uconst_ptr i -> failwith "I don't know what to do with ptr"
+      IRconst_ref (name, const_opt_t)
+    | Uconst_int i -> IRconst_int i
+    | Uconst_ptr _ -> failwith "I don't know what to do with ptr"
 and transl_fundecl ufunction = 
   let (body_t, body_fundecls) = transl ufunction.body in
   {
@@ -202,14 +224,18 @@ and transl_fundecl ufunction =
     fun_body = body_t;
   } :: body_fundecls
 
+
+(*
 let caml_apply3 arg1 arg2 arg3 closure =
   let Closure (f, arity, args) = closure in
   if arity == 3 then
-    [IRApply (f, [arg1; arg2; arg3; closure])]
+    [IRapply (Function_symbol f, [arg1; arg2; arg3; closure])]
   else
     let clos2 = Ident.create_local "clos2" in
     let clos3 = Ident.create_local "clos3" in
     (* TODO: find out what to do here, obviously we don't pass the closure value, but instead the identifier we created *)
-    [IRLet (Immutable, dfdf, clos2, IRApply (closure, [arg1; closure]));
-    IRLet (Immutable, dfdf, clos3, IRApply (clos2, [arg2; clos2]));
-    IRApply (clos3, [arg3; clos3])]
+    [IRLet (Immutable, dfdf, clos2, IRapply (closure, [arg1; closure]));
+    IRLet (Immutable, dfdf, clos3, IRapply (clos2, [arg2; clos2]));
+    IRapply (clos3, [arg3; clos3])]
+
+*)
