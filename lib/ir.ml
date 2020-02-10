@@ -57,12 +57,13 @@ let new_block_symbol =
   fun () -> incr last ; Block !last
 
 type expression = 
-  | IRlet of mutable_flag * value_kind * backend_var_with_provenance
+  | IRlet of mutable_flag * value_kind * backend_var
       * expression * expression list
   | IRprim of primitive * expression list
   | IRconst of constant
   | IRvar of backend_var
   | IRapply of ir_function * expression list
+  | IRapply_var of backend_var * expression list
   
   | IRalloc of block
 
@@ -71,7 +72,7 @@ type expression =
   | IRNop 
   | IRBlock of block_symbol * expression list
   | IRLoop of block_symbol * expression list
-  | IRIf of expression * expression list * expression list
+  | IRIf of expression list * expression list * expression list
   | IRBr of block_symbol
   | IRBr_if of expression * block_symbol
   | IRBr_if_not of expression * block_symbol
@@ -102,6 +103,7 @@ constant =
   | IRconst_function of ir_function
   | IRconst_ref of string * constant option
   | IRconst_int of int
+  | IRconst_ptr of int
 [@@deriving sexp]
 (*and  
 constant = 
@@ -112,12 +114,19 @@ constant =
 and
 ir_function =
   | Function_symbol of function_symbol
-  | Closure of function_symbol * arity * closure_argument list (* invariant: length of argument list is shorter than arity of the closure *)
+  | Function_closure of closure
+  [@@deriving sexp]
+and
+closure = Closure of function_symbol * arity * closure_argument list   (* invariant: length of argument list is shorter than arity of the closure *)
 [@@deriving sexp]
 and arity = int
-and closure_argument = constant
+and closure_argument = 
+  | ClosureArgConstant of constant
+  | ClosureArgVar of backend_var
+[@@deriving sexp]
 
 
+(* TODO: sort out sub expressions, single static assignment form-like stuff *)
 
 (* Record application and currying functions *)
 
@@ -130,6 +139,13 @@ let curry_function_sym n =
   else Function ("caml_tuplify" ^ Int.to_string (-n))
 
 
+let to_closure_arg x = match x with
+  | [y] -> (match y with
+    | IRconst z -> ClosureArgConstant z
+    | IRvar v -> ClosureArgVar v
+    | _ -> failwith (Format.sprintf "to_closure_arg applied to: %s" (Sexplib.Sexp.to_string_hum ~indent:1 (sexp_of_expression y))))
+  | _ -> failwith "to_closure_arg applied to something that is not a list with up to one element"
+
 let rec transl clambda = match clambda with
   | Usequence (instr, clambda') -> 
     let (instr_t, instr_fundecls) = transl instr in
@@ -141,7 +157,7 @@ let rec transl clambda = match clambda with
   | Ulet (mutable_flag, value_kind, backend_var_with_provenance, exp, body) -> 
     let (body_t, body_fundecls) = transl body in
     let (exp_t, exp_fundecls) = transl exp in
-    [IRlet (mutable_flag, value_kind, backend_var_with_provenance, List.hd exp_t, body_t)], exp_fundecls @ body_fundecls
+    [IRlet (mutable_flag, value_kind, Backend_var.With_provenance.var backend_var_with_provenance, List.hd exp_t, body_t)], exp_fundecls @ body_fundecls
 
   | Uprim (prim, args, _debug) -> 
     let tr = List.map transl args in
@@ -149,6 +165,12 @@ let rec transl clambda = match clambda with
     [IRprim (prim, List.concat args_t)], List.concat fundecls
 
   | Uconst (const) -> [IRconst (transl_const const)], []
+
+  | Uifthenelse (cond,then_,else_) ->
+    let (cond_t, cond_fundecls) = transl cond in
+    let (then_t, then_fundecls) = transl then_ in
+    let (else_t, else_fundecls) = transl else_ in
+    [IRIf (cond_t, then_t, else_t)], cond_fundecls @ then_fundecls @ else_fundecls
  
   | Uclosure (ufunction::[], []) ->
     let fundecls_t = transl_fundecl ufunction in
@@ -176,21 +198,11 @@ and transl_closure fundecls clos_vars =
       clos_t, List.concat fundecls_t
     | f :: rem ->
       let (rem_t, rem_fundecls_t) = transl_fundecls rem in
-      let rec to_const ls = match ls with
-        | [] -> []
-        | x :: xs -> 
-            let c = match x with
-              | [y] -> (match y with
-                | IRconst z -> z
-                | _ -> failwith "to_const applied to something that is not a constant")
-              | _ -> failwith "to_const applied to something that is not a list with up to one element"
-            in
-            c :: to_const xs
-      in
       if f.arity = 1 || f.arity = 0 then
-        [[IRconst (IRconst_function (Closure (Function f.label, f.arity, to_const rem_t)))]], transl_fundecl f @ rem_fundecls_t
+        [[IRconst (IRconst_function (Function_closure (Closure (Function f.label, f.arity, List.map to_closure_arg rem_t))))]], transl_fundecl f @ rem_fundecls_t
       else
-      [[IRconst (IRconst_function (Closure (curry_function_sym f.arity, f.arity, IRconst_function (Function_symbol (Function f.label)) :: to_const rem_t)))]], transl_fundecl f @ rem_fundecls_t
+      [[IRconst (IRconst_function (Function_closure (
+        Closure (curry_function_sym f.arity, f.arity, ClosureArgConstant (IRconst_function (Function_symbol (Function f.label))) :: List.map to_closure_arg rem_t))))]], transl_fundecl f @ rem_fundecls_t
   in
   let (clos_t, fundecls_t) = transl_fundecls fundecls in
   List.concat clos_t, fundecls_t
@@ -215,7 +227,7 @@ and transl_const uconstant =
       in 
       IRconst_ref (name, const_opt_t)
     | Uconst_int i -> IRconst_int i
-    | Uconst_ptr _ -> failwith "I don't know what to do with ptr"
+    | Uconst_ptr p -> IRconst_ptr p
 and transl_fundecl ufunction = 
   let (body_t, body_fundecls) = transl ufunction.body in
   {
@@ -225,17 +237,24 @@ and transl_fundecl ufunction =
   } :: body_fundecls
 
 
-(*
-let caml_apply3 arg1 arg2 arg3 closure =
+
+let gen_caml_apply3 arg1 arg2 arg3 closure =
   let Closure (f, arity, args) = closure in
   if arity == 3 then
-    [IRapply (Function_symbol f, [arg1; arg2; arg3; closure])]
+    [IRapply (Function_symbol f, args @ [arg1; arg2; arg3; to_closure_arg ([IRconst (IRconst_function (Function_closure closure))])])]
   else
     let clos2 = Ident.create_local "clos2" in
     let clos3 = Ident.create_local "clos3" in
     (* TODO: find out what to do here, obviously we don't pass the closure value, but instead the identifier we created *)
-    [IRLet (Immutable, dfdf, clos2, IRapply (closure, [arg1; closure]));
-    IRLet (Immutable, dfdf, clos3, IRapply (clos2, [arg2; clos2]));
-    IRapply (clos3, [arg3; clos3])]
+    [IRlet (Immutable, Pgenval, clos2, IRapply (Function_closure closure, [arg1; to_closure_arg ([IRconst (IRconst_function (Function_closure closure))])]);
+      [IRlet (Immutable, Pgenval, clos3, IRapply_var (clos2, [arg2; IRvar clos2]);
+      [IRapply_var (clos3, [arg3; IRvar clos3])])])]
 
-*)
+
+let gen_caml_curry3 arg closure =
+  let Closure (_f, arity, _args) = closure in
+  if arity == 3 then
+    [Closure (Function "caml_curry3_1", 2, to_closure_arg [arg] :: [to_closure_arg [IRconst (IRconst_function (Function_closure closure))]])]
+  else
+    failwith "Arity of closure is not 3"
+
