@@ -237,7 +237,7 @@ and transl_fundecl ufunction =
   } :: body_fundecls
 
 
-
+(*
 let gen_caml_apply3 arg1 arg2 arg3 closure =
   let Closure (f, arity, args) = closure in
   if arity == 3 then
@@ -258,3 +258,4 @@ let gen_caml_curry3 arg closure =
   else
     failwith "Arity of closure is not 3"
 
+*)

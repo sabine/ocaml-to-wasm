@@ -140,10 +140,10 @@ let end_gen_implementation ?toplevel prefixname
   let ch = open_out (prefixname ^ ".clambda") in
   let ppf = Format.formatter_of_out_channel ch in
   let _ = toplevel in
-  let sexp_string = Sexplib0.Sexp.to_string (Clambda_frontend.Clambda_types.sexp_of_clambda_with_constants clambda)
+  let sexp = Clambda_frontend.Clambda_types.sexp_of_clambda_with_constants clambda
   in
   (* instead of emitting Assembly, we just dump the Clambda sexps *)
-    Format.fprintf ppf "%s" sexp_string;
+    Sexplib0.Sexp.pp_hum_indent 1 ppf sexp;
     close_out ch
 
 let flambda_gen_implementation ?toplevel prefixname ~backend ~ppf_dump
