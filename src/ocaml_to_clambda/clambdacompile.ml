@@ -138,13 +138,18 @@ let set_export_info (ulambda, prealloc, structured_constants, export) =
 let end_gen_implementation ?toplevel prefixname
     (clambda:clambda_and_constants) =
   let ch = open_out (prefixname ^ ".clambda") in
+  let ch2 = open_out (prefixname ^ ".printclambda") in
   let ppf = Format.formatter_of_out_channel ch in
+  let ppf2 = Format.formatter_of_out_channel ch2 in
+  let (ulambda, _, _) = clambda in
   let _ = toplevel in
   let sexp = Clambda_frontend.Clambda_types.sexp_of_clambda_with_constants clambda
   in
   (* instead of emitting Assembly, we just dump the Clambda sexps *)
     Sexplib0.Sexp.pp_hum_indent 1 ppf sexp;
-    close_out ch
+    close_out ch;
+    Printclambda.clambda ppf2 ulambda;
+    close_out ch2
 
 let flambda_gen_implementation ?toplevel prefixname ~backend ~ppf_dump
     (program:Flambda.program) =
