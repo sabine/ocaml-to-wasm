@@ -5,8 +5,14 @@
  (modules ocaml_to_clambda clambdacompile)
  (libraries ocaml-compiler-libs.optcomp clambda_frontend))
 
-
 (executable
  (name clambda_to_wasm)
  (modules clambda_to_wasm)
  (libraries ocaml-compiler-libs.optcomp clambda_frontend sexplib ir))
+
+
+(executable
+ (name flambda_to_wasm)
+ (modules flambda_to_wasm)
+ (libraries flambda sexplib ir))
+

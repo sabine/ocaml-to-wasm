@@ -1,4 +1,11 @@
 (library
+ (name flambda)
+ (modules flambda_types)
+ (libraries ppx_sexp_conv.runtime-lib)
+ (preprocess (pps ppx_sexp_conv)))
+
+
+(library
  (name clambda_frontend)
  (modules clambda_types)
  (libraries ocaml-compiler-libs.optcomp ppx_sexp_conv.runtime-lib)
