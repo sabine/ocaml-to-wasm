@@ -14,5 +14,9 @@
 (executable
  (name flambda_to_wasm)
  (modules flambda_to_wasm)
- (libraries flambda sexplib ir))
+ (libraries flambda_frontend sexplib ir))
 
+(executable
+  (name flambda_interpreter)
+  (modules flambda_interpreter)
+  (libraries flambda_frontend zarith))

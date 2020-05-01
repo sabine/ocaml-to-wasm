@@ -1,3 +1,5 @@
+open Sexplib0
+open Sexp_conv
 
 
 type expr =
@@ -23,18 +25,18 @@ type expr =
     | Invalid of invalid_term_semantics_expr
     (** Code proved type-incorrect and therefore unreachable. *)
 and let_expr = {
-    let_expr_bound_vars_and_body : bound_vars_and_body;
-    let_expr_defining_expr : named;
+    lexpr_bound_vars_and_body : bound_vars_and_body;
+    lexpr_defining_expr : named;
 }
 and let_symbol_expr = {
-    let_symbol_expr_bound_symbols : bound_symbols;
-    let_symbol_expr_defining_expr : static_const;
-    let_symbol_expr_body : expr;
+    lsymbol_expr_bound_symbols : bound_symbols;
+    lsymbol_expr_defining_expr : static_const;
+    lsymbol_expr_body : expr;
 }
 and let_cont_expr =
     | LetContExprNon_recursive of {
-        let_cont_expr_handler : non_recursive_let_cont_handler;
-        let_cont_expr_num_free_occurrences : name_occurrences_num_occurrences;
+        lcont_expr_handler : non_recursive_let_cont_handler;
+        lcont_expr_num_free_occurrences : name_occurrences_num_occurrences;
     }
     | LetContExprRecursive of recursive_let_cont_handlers
 and apply_expr = {
@@ -84,16 +86,16 @@ and 'a or_variable =
     | OrVariableConst of 'a
     | OrVariableVar of variable
 
-and numbers_float_by_bit_pattern = Int64.t
+and numbers_float_by_bit_pattern = int64
 
-and targetint = Int64 (* WebAssembly has 64-bit integers, so let's use them *)
+and targetint = int64 (* WebAssembly has 64-bit integers, so let's use them *)
 
 and static_const = 
     | StaticConstBlock of tag_scannable * mutable_or_immutable * (field_of_block list)
     | StaticConstSets_of_closures of code_and_set_of_closures list
     | StaticConstBoxed_float of numbers_float_by_bit_pattern or_variable
-    | StaticConstBoxed_int32 of Int32.t or_variable
-    | StaticConstBoxed_int64 of Int64.t or_variable
+    | StaticConstBoxed_int32 of int32 or_variable
+    | StaticConstBoxed_int64 of int64 or_variable
     | StaticConstBoxed_nativeint of targetint or_variable
     | StaticConstImmutable_float_array of numbers_float_by_bit_pattern or_variable list
     | StaticConstMutable_string of { initial_value : string; }
@@ -107,19 +109,13 @@ and name_occurrences_num_occurrences =
     | NameOccurrencesNumOccurrencesZero
     | NameOccurrencesNumOccurrencesOne
     | NameOccurrencesNumOccurrencesMore_than_one
-and recursive_let_cont_handlers = (bindable_continuation * recursive_let_cont_handlers_t0) list
+and recursive_let_cont_handlers = (bindable_continuation * recursive_let_cont_handlers_t0)
 and recursive_let_cont_handlers_t0 = {
         recursive_let_cont_handlers_t0_handlers : continuation_handlers;
         recursive_let_cont_handlers_t0_body : expr;
     }
 
-and simple =
-    | SimpleNaked_immediate of immediate
-    | SimpleTagged_immediate of immediate
-    | SimpleNaked_float of numbers_float_by_bit_pattern
-    | SimpleNaked_int32 of Int32.t
-    | SimpleNaked_int64 of Int64.t
-    | SimpleNaked_nativeint of targetint
+and simple = int (* used as an identifier *)
 
 and continuation = {
     continuation_id : int;
@@ -242,7 +238,7 @@ and trap_action =
     | Reraise
     | No_trace
 
-and targetint_ocaml = unit (* TODO *)
+and targetint_ocaml = int64 (* TODO? *)
 and immediate = {
     value : targetint_ocaml;
     print_as_char : bool;
@@ -479,3 +475,12 @@ and bigarray_layout =
     | BigarrayLayoutUnknown
     | BigarrayLayoutC
     | BigarrayLayoutFortran
+[@@deriving sexp]
+
+type flambda_unit = {
+    imported_symbols : (symbol * flambda_kind) list;
+    return_continuation : continuation;
+    exn_continuation : continuation;
+    body : expr;
+}
+[@@deriving sexp]
